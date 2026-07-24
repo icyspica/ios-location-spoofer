@@ -18,16 +18,38 @@ jobs:
 
       - name: Build Unsigned App and Package IPA
         run: |
-          # Find the workspace or project file automatically
+          # 1. Find project or workspace
           PROJ=$(find . -maxdepth 1 -name "*.xcodeproj" -o -name "*.xcworkspace" | head -n 1)
           
+          # 2. Auto-detect the primary scheme name
+          SCHEME=$(xcodebuild -list -project "$PROJ" 2>/dev/null | awk '/Schemes:/{flag=1; next} /^[[:space:]]*$/{flag=0} flag' | tr -d ' ' | head -n 1)
+          if [ -z "$SCHEME" ]; then
+            SCHEME="LocationSpoofer"
+          fi
+          echo "Using Scheme: $SCHEME"
+
+          # 3. Build project with explicit destination parameter
           if [[ "$PROJ" == *.xcworkspace ]]; then
-            xcodebuild build -workspace "$PROJ" -scheme LocationSpoofer -sdk iphoneos -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+            xcodebuild build \
+              -workspace "$PROJ" \
+              -scheme "$SCHEME" \
+              -destination 'generic/platform=iOS' \
+              -configuration Release \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO
           else
-            xcodebuild build -project "$PROJ" -scheme LocationSpoofer -sdk iphoneos -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+            xcodebuild build \
+              -project "$PROJ" \
+              -scheme "$SCHEME" \
+              -destination 'generic/platform=iOS' \
+              -configuration Release \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO
           fi
 
-          # Package compiled app into an IPA
+          # 4. Create Payload directory and package IPA
           mkdir -p Payload
           cp -R build/Release-iphoneos/*.app Payload/ 2>/dev/null || cp -R ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Release-iphoneos/*.app Payload/
           zip -r LocationSpoofer.ipa Payload
